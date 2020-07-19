@@ -1,0 +1,36 @@
+- name: Setup AWX
+  hosts: awx-docker
+  gather_facts: yes
+
+  # WTF : some tasks need the VERSION file to be present in the right relative path
+  # Do the ansible developers know how to code ansible roles WTF
+  pre_tasks:
+    - name: Copy VERSION file for some AWX install tasks
+      copy:
+        src: ./VERSION
+        dest: ../VERSION
+      delegate_to: localhost
+
+  # AWX role path from the git submodule need to be present in local ansible.cfg to use this
+  # Here the roles from official installer are simply called upon the right server
+  roles:
+    - role: check_vars
+
+    - role: image_build
+      when: "dockerhub_base is not defined"
+
+    - role: image_push
+      when: "docker_registry is defined and dockerhub_base is not defined"
+
+    - role: kubernetes
+      when: "openshift_host is defined or kubernetes_context is defined"
+
+    - role: local_docker
+      when: "openshift_host is not defined and kubernetes_context is not defined"
+
+  post_tasks:
+    - name: remove VERSION copy
+      file:
+        path: ../VERSION
+        state: absent
+      delegate_to: localhost
